@@ -1,5 +1,4 @@
 FROM python:3
-LABEL maintainer="Rogério <rsalmei@gmail.com>"
 
 WORKDIR /usr/src/clearly
 

@@ -5,3 +5,7 @@ protobuf
 click
 about-time~=3.0
 ipython
+pdbpp
+grpcio-tools
+twine
+wheel

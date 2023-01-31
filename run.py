@@ -1,7 +1,8 @@
 from clearly.client import ClearlyClient
 
 print("Creating client")
-client = ClearlyClient(host='clearly-server', debug=True)
+client = ClearlyClient(host='localhost', debug=True)
 
-print('Capturing tasks...')
-client.capture_tasks()
+print('Capturing...')
+# client.capture_tasks()
+client.capture()

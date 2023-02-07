@@ -4,6 +4,8 @@ from datetime import datetime
 from typing import Any, Callable, Iterable, Optional, Tuple, Union
 
 import grpc
+import csv
+from datetime import datetime
 from about_time import about_time
 from about_time.core import HandleStats
 # noinspection PyProtectedMember
@@ -61,7 +63,7 @@ class ClearlyClient:
 
     def __init__(self, host: str = 'localhost', port: int = 12223, debug: bool = False):
         """Construct a Clearly Client instance.
-        
+
         Args:
             host: the hostname of the server
             port: the port of the server
@@ -71,7 +73,8 @@ class ClearlyClient:
         channel = grpc.insecure_channel('{}:{}'.format(host, port))
         self._stub = ClearlyServerStub(channel)
         self._modes = Modes(ModeTask.FAILURE, ModeWorker.WORKER)
-        self._modes = self._get_display_modes(get_env_int_tuple('CLI_DISPLAY_MODES', None))
+        self._modes = self._get_display_modes(
+            get_env_int_tuple('CLI_DISPLAY_MODES', None))
 
     def capture_tasks(self, tasks: Optional[str] = None,
                       mode: Union[None, int, ModeTask] = None) -> None:
@@ -161,13 +164,35 @@ class ClearlyClient:
             for realtime in self._stub.capture_realtime(request):
                 if realtime.HasField('task'):
                     self._display_task(realtime.task, mode.tasks)
+                    self.write_task_info(realtime.task, mode.tasks)
                 elif realtime.HasField('worker'):
                     self._display_worker(realtime.worker, mode.workers)
+                    self.write_worker_info(realtime.worker, mode.workers)
                 else:
                     print('unknown event:', realtime)
                     break
         except KeyboardInterrupt:  # pragma: no cover
             pass
+
+    def write_task_info(self, task: TaskMessage, mode: ModeTask):
+        timestamp = datetime.fromtimestamp(task.timestamp)
+        state = task.state
+        name = task.name
+        id = task.uuid
+        args = task.args
+        kwargs = task.kwargs
+        with open('tasks.csv', 'a') as f:
+            writer = csv.writer(f)
+            row = [str(timestamp), name, state, id,
+                   f"{str(args)}", f"{str(kwargs)}"]
+            writer.writerow(row)
+
+    def write_worker_info(self, worker: WorkerMessage, mode: ModeWorker):
+        with open('workers.csv', 'a') as f:
+            timestamp = datetime.fromtimestamp(worker.timestamp)
+            writer = csv.writer(f)
+            row = [str(timestamp), worker.state, worker.hostname]
+            writer.writerow(row)
 
     @set_user_friendly_errors
     def tasks(self, tasks: Optional[str] = None, mode: Union[None, int, ModeTask] = None,
@@ -207,7 +232,7 @@ class ClearlyClient:
     def workers(self, workers: Optional[str] = None,
                 mode: Union[None, int, ModeWorker] = None) -> None:
         """Fetch current data from known workers.
-        
+
         Args:
             workers: the pattern to filter workers
             mode: an optional display mode to present data
@@ -293,7 +318,8 @@ class ClearlyClient:
         if modes:
             self._modes = self._get_display_modes(modes)
 
-        modes = ('tasks', ModeTask, self._modes.tasks), ('workers', ModeWorker, self._modes.workers)
+        modes = ('tasks', ModeTask, self._modes.tasks), ('workers',
+                                                         ModeWorker, self._modes.workers)
         for title, klass, var_mode in modes:
             print(Colors.BLUE(title))
             for d in klass:
@@ -322,6 +348,8 @@ class ClearlyClient:
 
     @staticmethod
     def _display_task(task: TaskMessage, mode: ModeTask) -> None:
+        # import pdb
+        # pdb.set_trace()
         params, success, error = mode.spec
         ts = datetime.fromtimestamp(task.timestamp)
         print(Colors.DIM(ts.strftime('%H:%M:%S.%f')[:-3]), end=' ')
